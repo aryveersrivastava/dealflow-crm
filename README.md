@@ -1,5 +1,5 @@
 # ⚡ DealFlow CRM
-### Enterprise-Grade Multi-Tenant Real Estate Deal Infrastructure & CRM SaaS
+### Multi-Tenant Real Estate Deal Infrastructure Platform & CRM SaaS
 
 [![Next.js](https://img.shields.io/badge/Next.js-16.2.6-black?style=flat-square&logo=next.js)](https://nextjs.org)
 [![React](https://img.shields.io/badge/React-19.2.4-blue?style=flat-square&logo=react)](https://react.dev)
@@ -9,30 +9,30 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15%2B-blue?style=flat-square&logo=postgresql)](https://www.postgresql.org)
 [![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-darkgreen?style=flat-square&logo=github-actions)](https://github.com/features/actions)
 
-DealFlow CRM is a complete, production-grade, multi-tenant Real Estate Deal Infrastructure platform and CRM SaaS designed for modern, high-velocity real estate brokerages. Far beyond a simple listing portal, DealFlow CRM digitizes the entire lifecycle of real estate transactions—orchestrating buyer requirements, executing complex algorithmic property matching, driving interactive Kanban pipelines, managing broker collaboration, and maintaining immutable audit trails.
+DealFlow CRM is a complete, production-grade SaaS deal infrastructure platform for real estate brokerages. Unlike simple property listing portals, DealFlow CRM digitizes the entire lifecycle of real estate transactions—from tracking buyer requirements and auto-matching properties to driving interactive Kanban pipelines, broker co-broking, and logging compliance audit trails.
 
 ---
 
 ## 🌎 The Real-World Problem Solved
 
-Real estate transactions are highly complex, multi-party deals characterized by high transaction values and long sales cycles. Traditional real estate operations suffer from severe operational bottlenecks:
+Real estate operations have traditionally been bottlenecked by fragmented tools, manual processes, and security vulnerabilities:
 
-1. **Information Asymmetry & Data Silos:** Agents manage properties in spreadsheets while buyer requirements live in chat histories or notebooks. Important details get lost, and matching properties to buyers is done manually from memory.
-2. **Weak Multi-Tenant Data Isolation:** Many multi-tenant CRMs isolate data purely at the application layer. A single bug in a database query can expose sensitive client requirements, pricing models, or lead notes to competing brokerages.
-3. **Inefficient Co-Broking & Collaboration:** Real estate agents frequently co-broke deals (collaborating with agents from other brokerages), but lack a secure, structured mechanism to announce new properties or match listings without leaking client details.
-4. **Poor Pipeline Visibility:** Brokerage managers lack real-time visibility into the status of active deals, scheduled site visits, negotiations, and agent performance, leading to inaccurate revenue forecasting.
+1. **Information Asymmetry & Data Silos:** Agents track listings in Excel spreadsheets while buyer requirements are buried in emails, text messages, or physical notebooks. This lack of centralized mapping leads to missed deals and delayed sales.
+2. **Weak Multi-Tenant Security & Compliance Risks:** In standard real estate CRMs, data is isolated solely via application logic. A single programmer error in a `WHERE` clause can leak sensitive buyer budgets, pricing strategies, or seller notes to competing brokerages.
+3. **Friction in Broker Collaboration (Co-Broking):** Co-broking is critical in real estate, but sharing listings with external agents often carries the risk of leaking client contacts or property coordinates.
+4. **Poor Pipeline Visibility & Reporting:** Brokerage principals lack real-time visibility into agent performance, active negotiation values, or pipeline progression, leading to unreliable business forecasts.
 
 ### How DealFlow CRM Helps:
-* **The Smart Matching Engine** automatically maps buyer requirements against active listings in real-time, removing manual matching overhead.
-* **Dual-Layer Tenant Isolation** guarantees that customer databases, pricing, and notes are securely isolated at both the application query level and database level using PostgreSQL Row-Level Security (RLS).
-* **Interactive Kanban Pipelines** digitize broker workflows, providing managers and agents with visual progress, deal values, and historical audit logs.
-* **The Collaboration Hub** acts as an internal network for brokerages to co-broke securely, sharing properties and buyer needs without exposing client identities.
+* **Algorithmic Property Matching:** Instantly computes matches between buyer requirements and properties based on 5 parameters, eliminating manual lookup.
+* **Dual-Layer Database Security:** Combines application-level client logic with raw database Row-Level Security (RLS) to ensure that brokerage tenant data remains fully isolated and immune to cross-tenant leak vectors.
+* **Streamlined Co-Broking:** Built-in shared brokerage boards allow agents to advertise buyer needs and listings internally to other brokers without compromising client confidentiality.
+* **Interactive CRM Funnels:** Digitizes the brokerage pipeline from onboarding to site visits, negotiations, and closed deals, with automated audit trails.
 
 ---
 
 ## 🏛️ System Architecture & Tenant Isolation
 
-To meet the compliance requirements of elite enterprise brokerages, DealFlow CRM implements a **Dual-Layer Tenant Isolation Security Model**:
+DealFlow CRM employs a strict **Dual-Layer Multi-Tenant Security** model to ensure complete data isolation between brokerages (tenants):
 
 ```
        ┌─────────────────────────────────────────────────────────┐
@@ -63,63 +63,66 @@ To meet the compliance requirements of elite enterprise brokerages, DealFlow CRM
        └─────────────────────────────────────────────────────────┘
 ```
 
-1. **Application-Level Isolation:** Integrated directly into the [Prisma Client singleton](file:///src/lib/prisma/client.ts). Every database query is automatically scoped to the active user's `tenant_id` resolved from their Supabase JWT session, preventing cross-tenant data leaks.
-2. **Database-Level Isolation:** Powered by PostgreSQL **Row Level Security (RLS)** ([rls_policies.sql](file:///prisma/migrations/rls_policies.sql)). Policies restrict read/write access to rows where `tenant_id` matches the tenant ID resolved from the active user's context.
+1. **Application Layer Isolation**: Built into the [Prisma Client singleton](file:///c:/Users/aryve/OneDrive/Desktop/REAL%20STATE/dealflow-crm/src/lib/prisma/client.ts) to automatically query and isolate records by `tenant_id` resolved from the user session context.
+2. **Database Layer Isolation**: Enforced by Postgres **Row Level Security (RLS) policies** ([rls_policies.sql](file:///c:/Users/aryve/OneDrive/Desktop/REAL%20STATE/dealflow-crm/prisma/migrations/rls_policies.sql)). A security-definer helper function resolves user context and blocks cross-tenant reads or writes directly at the query execution level.
 
 ---
 
 ## ⚙️ Tech Stack & Architectural Rationale
 
-| Layer | Technology | Rationale |
-| :--- | :--- | :--- |
-| **Frontend Framework** | **Next.js 16.2.6 (App Router) & React 19** | Empowers server-side rendering (SSR) for fast initial loads, dynamic API routes, and strict routing layout structures. |
-| **Database ORM** | **Prisma ORM 6.19.3** | Delivers developer productivity with fully-typed database client schemas, autocompletion, and robust migrations. |
-| **Database Engine** | **PostgreSQL 15+** | Needed to support relational schemas, JSONB columns for property metadata, and native database Row-Level Security (RLS). |
-| **Identity & Storage** | **Supabase Auth & Storage** | Provides secure, JWT-based user authentication, role-based session tokens, and scalable storage buckets for listing media. |
-| **Styling & Theme** | **Tailwind CSS & CSS Variables** | Enables responsive designs and glassmorphic user interfaces (supporting light and dark modes). |
-| **State Management** | **React Hook Form & Nuqs** | Prevents unwanted re-renders using uncontrolled inputs for forms and manages search states directly in URL query parameters. |
+* **Framework:** **Next.js 16.2.6 (App Router) & React 19**
+  * *Why:* Enables React Server Components (RSC) to reduce client bundles, simplifies API route definitions, and structures dynamic nested views (such as auth and dashboard spaces) efficiently.
+* **ORM:** **Prisma Client 6.19.3**
+  * *Why:* Offers type-safe queries, a unified schema configuration, and automated migrations. Extended with custom middleware to enforce tenant scoping.
+* **Database:** **PostgreSQL 15+**
+  * *Why:* Required for handling complex relational schemas, JSONB specifications, and native database Row-Level Security (RLS) policies.
+* **Backend BaaS:** **Supabase Auth & Storage**
+  * *Why:* Accelerates development by offering fully managed, JWT-based OAuth, email authentication, and secure, high-bandwidth storage buckets for listing photos.
+* **Styling:** **Tailwind CSS & CSS Variables**
+  * *Why:* Allows the design of beautiful, glassmorphic dark-mode dashboards and ensures complete responsiveness across desktop and mobile screens.
+* **Form & Query State:** **React Hook Form & Nuqs**
+  * *Why:* Optimizes client-side performance, preventing unnecessary re-renders during input collection and keeping search filters synchronized in the URL query string.
 
 ---
 
 ## ✨ Core Platform Capabilities
 
 ### 1. 🎯 Smart Matching Engine (5-Dimension Weighted Scoring)
-* **Dynamic Algorithmic Match Pipeline:** Evaluates properties against buyer requirements based on:
-  * **Location & Locality Match (30%):** Exact match or proximity mapping.
-  * **Budget Overlap (25%):** Pricing boundaries, ensuring property price fits within the buyer's range.
-  * **Property Type Compatibility (20%):** Flat, Villa, Plot, Office Space, etc.
-  * **Transaction Type (15%):** Sale, Rent, or Lease.
-  * **Area Boundaries (10%):** Minimum and maximum built-up/carpet area matching.
-* **Bidirectional Matching:**
-  * **Forward Matching:** Find properties matching a buyer's requirement.
-  * **Reverse Matching:** Find buyers matching a newly listed property.
-* **Score Visualization:** Visualizes match rankings with score gauges, parameter breakdown progress bars, and direct "Create Lead" matching action buttons.
+* **Algorithmic Match Pipeline**: Evaluates matching candidates across 5 key dimensions:
+  * Location & Locality Match (30%)
+  * Budget Overlap (25%)
+  * Property Type Compatibility (20%)
+  * Transaction Type (Sale/Rent/Lease) (15%)
+  * Area Boundaries (10%)
+* **Bidirectional Matching**: Automatically maps properties matching a buyer's requirement (forward matching) and buyers matching a property listing (reverse mapping).
+* **Interactive UI**: Visualizes match rankings with score gauges, parameter breakdown progress bars, and direct "Create Lead" matching action buttons.
 
 ### 2. 📋 Interactive Kanban CRM & Lead Workspace
-* **Custom Drag-and-Drop Pipeline:** A 7-stage pipeline (`NEW_LEAD`, `CONTACTED`, `INTERESTED`, `SITE_VISIT`, `NEGOTIATION`, `CLOSED_WON`, `CLOSED_LOST`) utilizing native HTML5 Drag and Drop APIs to ensure high performance and avoid React 19 library conflicts.
-* **Lead Workspace Tabs:**
-  * **Activity Timeline:** Track notes, system alerts, status transitions, and follow-ups.
-  * **Tasks Manager:** Create, prioritize, and assign actionable check-items for each lead.
-  * **Internal Notes:** Pin and manage notes for team collaboration.
-  * **Site Visit Scheduler:** Schedule property tours and collect customer ratings and feedback.
+* **Funnel Pipeline**: A responsive 7-stage drag-and-drop lead board (New Lead, Contacted, Interested, Site Visit, Negotiation, Closed Won, Closed Lost) powered by native HTML5 Drag and Drop APIs for high-performance rendering under React 19.
+* **Granular Tracking**: Includes deal value calculation, lost reason logging, follow-up scheduling, and lead status change history.
+* **Lead Workspace Tabs**:
+  * **Activity Timeline**: Complete feed logging notes, emails, meetings, and automated events.
+  * **Tasks Manager**: A checklist system supporting prioritization and status updates.
+  * **Internal Notes**: Inline text area supporting note pinning.
+  * **Site Visit scheduler**: Schedules property tours and collects customer feedback/ratings.
 
-### 3. 🏡 Property Listing & Gallery Management
-* **Advanced Forms:** Multi-tab wizards for property characteristics, including pricing parameters, specifications, location details, and image uploads.
-* **Interactive Media Viewer:** Glassmorphic image gallery supporting lightboxes.
-* **Dynamic Filters:** URL-bound filters for locality, transaction type, property type, price, and carpet area.
+### 3. 🏡 Property Listings & Galleries
+* **Multi-Tab Forms**: Add or edit properties with clean inputs for pricing, floor details, furnishing, amenities list, location parameters, and image URL galleries.
+* **Responsive Media Viewer**: Glassmorphic preview gallery featuring fullscreen lightboxes.
+* **Dynamic Search & Filtering**: Multi-param query filters targeting localities, property categories, price ranges, and furnishing states.
 
 ### 4. 📊 Performance Analytics
-* **Dashboard KPIs:** Real-time totals for active leads, properties, buyer requirements, and total pipeline value.
-* **Lightweight Charts:** Monthly conversion funnels, activity trends, and broker performance rankings.
+* **Dashboard Stats**: Real-time summary cards mapping active leads, listings, requirements, and total pipeline value.
+* **High-Performance Charts**: Visualizes monthly conversion funnels, activity timelines, and active broker leaderboards using responsive, lightweight custom components to bypass heavy library bundle sizes.
 
 ### 5. 👥 Broker Collaboration Hub
-* **Co-Broke Feed:** Real-time brokerage feed displaying announcements of new listings and buyer requirements.
-* **In-App Notification Bell:** A polling notification system alert center for real-time matches and brokerage events.
+* **Shared Activity Feed**: Real-time collaborative panel displaying notifications of new brokerage listings, buyer requirements, and co-broker requests.
+* **In-App Notification Bell**: A polling notification engine that draws alerts for match notifications and brokerage alerts.
 
-### 6. ⚙️ Administrative Control Panels
-* **Tenant Quotas:** Configure maximum user, property, and requirement limits per brokerage.
-* **User Management:** View team structures, deactivate accounts, and update roles (`Super Admin`, `Brokerage Admin`, `Broker`, `Agent`, `Client`).
-* **Listing Moderation:** Audit flagged listings and approve or archive properties.
+### 6. ⚙️ Administrative Dashboards
+* **Tenant Limits & Features**: Super Admins can set maximum user limits, maximum properties, and toggle experimental feature flags (e.g. Matching Engine V2) per brokerage.
+* **User Management**: View active users, update team roles (Brokerage Admin, Broker, Agent, Client), and manage account deactivations.
+* **Moderation Panel**: Review flagged listings and approve/archive properties violating guidelines.
 
 ---
 
@@ -144,7 +147,7 @@ dealflow-crm/
     │   │   ├── crm/         # Lead workspace & Kanban pipeline
     │   │   ├── properties/  # Listings explorer, additions, and edits
     │   │   ├── requirements/# Buyer requirements explorer & manager
-    │   │   └── settings/    # Profile, brokerage, & appearance controllers
+    │   │   └── settings/    # Profile, team, & appearance controllers
     │   ├── api/             # 14 REST API endpoint routes
     │   ├── globals.css      # Core Tailwind styling & custom glassmorphism components
     │   └── middleware.ts    # Route guard securing paths & tenant extraction
@@ -153,7 +156,7 @@ dealflow-crm/
     │   └── shared/          # Shared components (page-headers, KPI cards)
     ├── lib/
     │   ├── prisma/client.ts # Cache-enabled Prisma Client wrapper
-    │   ├── supabase/        # Supabase config, clients, and middleware helpers
+    │   ├── supabase/        # Supabase config, clients, & middleware helpers
     │   └── constants.ts     # Global states, enums, & label systems
     └── services/            # Centralized business logic & database managers
 ```
@@ -161,6 +164,8 @@ dealflow-crm/
 ---
 
 ## 🛠️ Step-by-Step Local Setup Guide
+
+Follow these steps to run DealFlow CRM on your local machine:
 
 ### 1. Clone the Repository & Install Dependencies
 ```bash
@@ -185,18 +190,20 @@ DIRECT_URL="postgresql://postgres:password@db.xxx.supabase.co:5432/postgres"
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
 NEXT_PUBLIC_APP_NAME="DealFlow CRM"
 ```
+> [!NOTE]
+> You can set up a free PostgreSQL database on [Supabase](https://supabase.com) or [Neon](https://neon.tech) in under 2 minutes.
 
 ### 3. Push Database Schema
-Sync database tables with Prisma schema:
+Compile the Prisma models and create the tables in your database:
 ```bash
 npx prisma db push
 ```
 
 ### 4. Enable Row Level Security (RLS)
-Execute the SQL statements inside [rls_policies.sql](file:///prisma/migrations/rls_policies.sql) in your database query editor (e.g. Supabase SQL Editor) to enforce tenant level isolation.
+Execute the SQL statements in [rls_policies.sql](file:///c:/Users/aryve/OneDrive/Desktop/REAL%20STATE/dealflow-crm/prisma/migrations/rls_policies.sql) in your database query editor (e.g. Supabase SQL Editor) to enforce tenant level isolation.
 
 ### 5. Seed Mock Data
-Populate tables with default brokerage firms, agent profiles, listings, requirements, pipeline leads, and checklist items:
+Populate the tables with brokerage firms, agent profiles, listings, buyer requirements, and matched pipeline deals:
 ```bash
 node prisma/seed.js
 ```
@@ -205,7 +212,7 @@ node prisma/seed.js
 ```bash
 npm run dev
 ```
-Open [http://localhost:3000](http://localhost:3000) to view the application.
+Navigate to [http://localhost:3000](http://localhost:3000) to review the platform.
 
 ---
 

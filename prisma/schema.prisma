@@ -1,0 +1,563 @@
+// ==============================================================
+// DealFlow CRM — Prisma Schema
+// Multi-Tenant Real Estate Deal Infrastructure Platform
+// ==============================================================
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearchPostgres"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ======================== ENUMS ========================
+
+enum UserRole {
+  SUPER_ADMIN
+  BROKERAGE_ADMIN
+  BROKER
+  AGENT
+}
+
+enum PropertyType {
+  APARTMENT
+  VILLA
+  PLOT
+  COMMERCIAL_OFFICE
+  COMMERCIAL_SHOP
+  COMMERCIAL_SHOWROOM
+  WAREHOUSE
+  FARMHOUSE
+  PENTHOUSE
+  STUDIO
+  INDEPENDENT_HOUSE
+  BUILDER_FLOOR
+}
+
+enum TransactionType {
+  SALE
+  RENT
+  LEASE
+  PG
+}
+
+enum FurnishingStatus {
+  FURNISHED
+  SEMI_FURNISHED
+  UNFURNISHED
+}
+
+enum PropertyStatus {
+  DRAFT
+  ACTIVE
+  UNDER_OFFER
+  SOLD
+  RENTED
+  ARCHIVED
+  FLAGGED
+}
+
+enum RequirementUrgency {
+  IMMEDIATE
+  WITHIN_1_MONTH
+  WITHIN_3_MONTHS
+  WITHIN_6_MONTHS
+  FLEXIBLE
+}
+
+enum RequirementStatus {
+  ACTIVE
+  PARTIALLY_FULFILLED
+  FULFILLED
+  EXPIRED
+  CANCELLED
+}
+
+enum InvestmentGoal {
+  END_USE
+  INVESTMENT
+  RENTAL_INCOME
+  RESALE
+  COMMERCIAL_USE
+}
+
+enum LeadStatus {
+  NEW_LEAD
+  CONTACTED
+  INTERESTED
+  SITE_VISIT
+  NEGOTIATION
+  CLOSED_WON
+  CLOSED_LOST
+}
+
+enum ActivityType {
+  NOTE
+  CALL
+  EMAIL
+  MEETING
+  SITE_VISIT
+  FOLLOW_UP
+  STATUS_CHANGE
+  DEAL_UPDATE
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
+enum CollaborationType {
+  SHARED_LISTING
+  SHARED_REQUIREMENT
+  CO_BROKE
+  NOTE
+}
+
+enum VisitStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum SubscriptionPlan {
+  FREE
+  STARTER
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  TRIAL
+  PAST_DUE
+  CANCELLED
+  SUSPENDED
+}
+
+// ======================== MODELS ========================
+
+/// Brokerage firm — the tenant entity for multi-tenant isolation.
+/// Every major data table references this through tenant_id.
+model BrokerageFirm {
+  id                 String             @id @default(cuid())
+  name               String
+  slug               String             @unique
+  logo               String?
+  address            String?
+  city               String?
+  state              String?
+  phone              String?
+  email              String?
+  website            String?
+  reraNumber         String?            @map("rera_number")
+
+  // Billing-ready fields (V2 Stripe integration)
+  subscriptionPlan   SubscriptionPlan   @default(FREE) @map("subscription_plan")
+  subscriptionStatus SubscriptionStatus @default(ACTIVE) @map("subscription_status")
+  maxUsers           Int                @default(50) @map("max_users")
+  maxProperties      Int                @default(500) @map("max_properties")
+  maxRequirements    Int                @default(500) @map("max_requirements")
+  featureFlags       Json               @default("{}") @map("feature_flags")
+
+  isActive           Boolean            @default(true) @map("is_active")
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
+
+  // Relations
+  users              User[]
+  properties         Property[]
+  requirements       Requirement[]
+  leads              Lead[]
+  collaborations     Collaboration[]
+
+  @@map("brokerage_firms")
+}
+
+/// Application user — linked to Supabase Auth via supabase_id.
+model User {
+  id              String   @id @default(cuid())
+  supabaseId      String   @unique @map("supabase_id")
+  tenantId        String   @map("tenant_id")
+  email           String
+  fullName        String   @map("full_name")
+  phone           String?
+  avatar          String?
+  role            UserRole @default(AGENT)
+  isActive        Boolean  @default(true) @map("is_active")
+  lastLoginAt     DateTime? @map("last_login_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  tenant          BrokerageFirm @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  properties      Property[]
+  requirements    Requirement[]
+  leads           Lead[]       @relation("AssignedLeads")
+  createdLeads    Lead[]       @relation("CreatedLeads")
+  activities      Activity[]
+  tasks           Task[]       @relation("AssignedTasks")
+  createdTasks    Task[]       @relation("CreatedTasks")
+  notes           Note[]
+  visits          Visit[]
+  sentCollabs     Collaboration[] @relation("SentCollabs")
+  receivedCollabs Collaboration[] @relation("ReceivedCollabs")
+  notifications   Notification[]
+
+  @@index([tenantId])
+  @@index([supabaseId])
+  @@index([email])
+  @@map("users")
+}
+
+/// Property listing with full real estate metadata.
+model Property {
+  id              String          @id @default(cuid())
+  tenantId        String          @map("tenant_id")
+  createdById     String          @map("created_by_id")
+
+  // Core details
+  title           String
+  description     String?         @db.Text
+  propertyType    PropertyType    @map("property_type")
+  transactionType TransactionType @map("transaction_type")
+  status          PropertyStatus  @default(ACTIVE)
+
+  // Pricing & area
+  price           Decimal         @db.Decimal(15, 2)
+  area            Decimal         @db.Decimal(10, 2)
+  areaUnit        String          @default("sqft") @map("area_unit")
+
+  // Specifications
+  bedrooms        Int?
+  bathrooms       Int?
+  furnishing      FurnishingStatus?
+  floor           Int?
+  totalFloors     Int?            @map("total_floors")
+  facing          String?
+
+  // Location
+  city            String
+  locality        String
+  address         String?         @db.Text
+  latitude        Decimal?        @db.Decimal(10, 8)
+  longitude       Decimal?        @db.Decimal(11, 8)
+
+  // Owner/contact
+  ownerName       String?         @map("owner_name")
+  ownerPhone      String?         @map("owner_phone")
+
+  // Metadata arrays
+  amenities       String[]        @default([])
+  tags            String[]        @default([])
+  images          String[]        @default([])
+  documents       String[]        @default([])
+
+  // Engagement
+  isFeatured      Boolean         @default(false) @map("is_featured")
+  viewCount       Int             @default(0) @map("view_count")
+  publishedAt     DateTime?       @map("published_at")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  // Relations
+  tenant          BrokerageFirm   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy       User            @relation(fields: [createdById], references: [id])
+  leads           Lead[]
+  visits          Visit[]
+  collaborations  Collaboration[]
+
+  // Indexes for optimized queries
+  @@index([tenantId])
+  @@index([city, locality])
+  @@index([propertyType])
+  @@index([transactionType])
+  @@index([price])
+  @@index([status])
+  @@index([createdAt])
+  @@map("properties")
+}
+
+/// Buyer requirement — the core marketplace entity.
+model Requirement {
+  id              String             @id @default(cuid())
+  tenantId        String             @map("tenant_id")
+  createdById     String             @map("created_by_id")
+
+  // Core details
+  title           String
+  description     String?            @db.Text
+  buyerName       String             @map("buyer_name")
+  buyerPhone      String?            @map("buyer_phone")
+  buyerEmail      String?            @map("buyer_email")
+
+  // Matching criteria
+  propertyType    PropertyType       @map("property_type")
+  transactionType TransactionType    @map("transaction_type")
+  budgetMin       Decimal            @map("budget_min") @db.Decimal(15, 2)
+  budgetMax       Decimal            @map("budget_max") @db.Decimal(15, 2)
+  areaMin         Decimal?           @map("area_min") @db.Decimal(10, 2)
+  areaMax         Decimal?           @map("area_max") @db.Decimal(10, 2)
+  bedrooms        Int?
+
+  // Location preferences
+  city            String
+  locality        String?
+  preferredLocalities String[]       @default([]) @map("preferred_localities")
+
+  // Intent & urgency
+  urgency         RequirementUrgency @default(FLEXIBLE)
+  investmentGoal  InvestmentGoal?    @map("investment_goal")
+  furnishing      FurnishingStatus?
+
+  // Status
+  status          RequirementStatus  @default(ACTIVE)
+  notes           String?            @db.Text
+  isPublic        Boolean            @default(true) @map("is_public")
+  matchCount      Int                @default(0) @map("match_count")
+
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+
+  // Relations
+  tenant          BrokerageFirm      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy       User               @relation(fields: [createdById], references: [id])
+  leads           Lead[]
+  collaborations  Collaboration[]
+
+  // Indexes for matching engine performance
+  @@index([tenantId])
+  @@index([city])
+  @@index([propertyType])
+  @@index([transactionType])
+  @@index([budgetMin, budgetMax])
+  @@index([urgency])
+  @@index([status])
+  @@index([createdAt])
+  @@map("requirements")
+}
+
+/// CRM Lead — connects buyer interest to properties/requirements.
+model Lead {
+  id              String     @id @default(cuid())
+  tenantId        String     @map("tenant_id")
+  createdById     String     @map("created_by_id")
+  assignedToId    String?    @map("assigned_to_id")
+  propertyId      String?    @map("property_id")
+  requirementId   String?    @map("requirement_id")
+
+  // Contact
+  contactName     String     @map("contact_name")
+  contactPhone    String?    @map("contact_phone")
+  contactEmail    String?    @map("contact_email")
+
+  // Pipeline
+  source          String?
+  status          LeadStatus @default(NEW_LEAD)
+  score           Int        @default(0)
+  expectedValue   Decimal?   @map("expected_value") @db.Decimal(15, 2)
+  notes           String?    @db.Text
+  lostReason      String?    @map("lost_reason")
+
+  // Tracking
+  closedAt        DateTime?  @map("closed_at")
+  nextFollowUp    DateTime?  @map("next_follow_up")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+
+  // Relations
+  tenant          BrokerageFirm @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy       User       @relation("CreatedLeads", fields: [createdById], references: [id])
+  assignedTo      User?      @relation("AssignedLeads", fields: [assignedToId], references: [id])
+  property        Property?  @relation(fields: [propertyId], references: [id])
+  requirement     Requirement? @relation(fields: [requirementId], references: [id])
+  activities      Activity[]
+  taskItems       Task[]
+  noteItems       Note[]
+  visits          Visit[]
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([assignedToId])
+  @@index([createdAt])
+  @@index([nextFollowUp])
+  @@map("leads")
+}
+
+/// Activity log entry — tracks all CRM interactions.
+model Activity {
+  id          String       @id @default(cuid())
+  tenantId    String       @map("tenant_id")
+  userId      String       @map("user_id")
+  leadId      String?      @map("lead_id")
+  type        ActivityType
+  title       String
+  description String?      @db.Text
+  metadata    Json?
+  createdAt   DateTime     @default(now()) @map("created_at")
+
+  // Relations
+  user        User         @relation(fields: [userId], references: [id])
+  lead        Lead?        @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([leadId])
+  @@index([createdAt])
+  @@map("activities")
+}
+
+/// Task for CRM workflow management.
+model Task {
+  id           String       @id @default(cuid())
+  tenantId     String       @map("tenant_id")
+  createdById  String       @map("created_by_id")
+  assignedToId String?      @map("assigned_to_id")
+  leadId       String?      @map("lead_id")
+  title        String
+  description  String?      @db.Text
+  priority     TaskPriority @default(MEDIUM)
+  status       TaskStatus   @default(TODO)
+  dueDate      DateTime?    @map("due_date")
+  completedAt  DateTime?    @map("completed_at")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  // Relations
+  createdBy    User         @relation("CreatedTasks", fields: [createdById], references: [id])
+  assignedTo   User?        @relation("AssignedTasks", fields: [assignedToId], references: [id])
+  lead         Lead?        @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([assignedToId])
+  @@index([status])
+  @@index([dueDate])
+  @@map("tasks")
+}
+
+/// Internal notes attached to leads.
+model Note {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  userId    String   @map("user_id")
+  leadId    String?  @map("lead_id")
+  content   String   @db.Text
+  isPinned  Boolean  @default(false) @map("is_pinned")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user      User     @relation(fields: [userId], references: [id])
+  lead      Lead?    @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([leadId])
+  @@map("notes")
+}
+
+/// Site visit scheduling and tracking.
+model Visit {
+  id          String      @id @default(cuid())
+  tenantId    String      @map("tenant_id")
+  userId      String      @map("user_id")
+  leadId      String?     @map("lead_id")
+  propertyId  String      @map("property_id")
+  scheduledAt DateTime    @map("scheduled_at")
+  status      VisitStatus @default(SCHEDULED)
+  feedback    String?     @db.Text
+  rating      Int?
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  user        User        @relation(fields: [userId], references: [id])
+  lead        Lead?       @relation(fields: [leadId], references: [id])
+  property    Property    @relation(fields: [propertyId], references: [id])
+
+  @@index([tenantId])
+  @@index([scheduledAt])
+  @@map("visits")
+}
+
+/// Broker collaboration — shared listings, co-broking, internal notes.
+model Collaboration {
+  id              String            @id @default(cuid())
+  tenantId        String            @map("tenant_id")
+  fromUserId      String            @map("from_user_id")
+  toUserId        String            @map("to_user_id")
+  type            CollaborationType
+  propertyId      String?           @map("property_id")
+  requirementId   String?           @map("requirement_id")
+  message         String?           @db.Text
+  isAccepted      Boolean?          @map("is_accepted")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  // Relations
+  tenant          BrokerageFirm     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  fromUser        User              @relation("SentCollabs", fields: [fromUserId], references: [id])
+  toUser          User              @relation("ReceivedCollabs", fields: [toUserId], references: [id])
+  property        Property?         @relation(fields: [propertyId], references: [id])
+  requirement     Requirement?      @relation(fields: [requirementId], references: [id])
+
+  @@index([tenantId])
+  @@index([toUserId])
+  @@index([createdAt])
+  @@map("collaborations")
+}
+
+/// In-app notification system.
+model Notification {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  userId    String   @map("user_id")
+  title     String
+  message   String
+  link      String?
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([userId, isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+/// Audit log for compliance, traceability, and accountability.
+/// Supports brokerage accountability, operational traceability,
+/// compliance workflows, and future legal/dispute-resolution features.
+model AuditLog {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  userId    String?  @map("user_id")
+  action    String
+  entity    String
+  entityId  String?  @map("entity_id")
+  oldData   Json?    @map("old_data")
+  newData   Json?    @map("new_data")
+  ipAddress String?  @map("ip_address")
+  userAgent String?  @map("user_agent")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId])
+  @@index([entity, entityId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
